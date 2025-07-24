@@ -3,27 +3,36 @@ name: Test Workflow
 on:
   issue_comment:
     types: [created]
+  push:
+    branches:
+      - dev
 
 jobs:
   test:
-    # Pull Requestのコメントかつ、コメントが「tests」の場合のみ実行
-    if: github.event.issue.pull_request && contains(github.event.comment.body, 'tests')
+    # Pull Requestのコメントかつ、コメントが「tests」の場合、またはdevブランチへのpushの場合に実行
+    if: (github.event.issue.pull_request && contains(github.event.comment.body, 'tests')) || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     runs-on: ubuntu-latest
     
     steps:
-      - name: Get PR information
-        id: pr_info
+      - name: Get SHA information
+        id: sha_info
         uses: actions/github-script@v7
         with:
           script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            return pr.data.head.sha;
+            if (context.eventName === 'issue_comment') {
+              // PR コメントの場合
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+              return pr.data.head.sha;
+            } else {
+              // push の場合
+              return context.sha;
+            }
           result-encoding: string
       
-      - name: Echo PR branch SHA
+      - name: Echo SHA
         run: |
-          echo "PR branch latest SHA: ${{ steps.pr_info.outputs.result }}"
+          echo "Latest SHA: ${{ steps.sha_info.outputs.result }}"
